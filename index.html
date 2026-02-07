@@ -22,6 +22,8 @@
               'tomato-dim': '#cd5c5c',
               'soft-green': '#66cdaa',
               'dark-surface': '#252525',
+              'amber-glow': '#fbbf24',
+              'blue-glow': '#60a5fa',
             },
             animation: {
               'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
@@ -32,7 +34,7 @@
     </script>
     <style>
       body {
-        background-color: #121212;
+        background-color: #0f172a; /* Slate 900 base */
         color: #e0e0e0;
         -webkit-font-smoothing: antialiased;
       }
@@ -41,19 +43,180 @@
         width: 0px;
         background: transparent;
       }
+      
+      /* Circular Progress Styles */
+      .progress-ring__circle {
+        transition: stroke-dashoffset 0.5s linear, stroke 0.5s ease;
+        transform: rotate(-90deg);
+        transform-origin: 50% 50%;
+      }
+      
+      .glass-panel {
+        background: rgba(31, 41, 55, 0.5);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .nav-btn.active {
+        background-color: #374151;
+        color: white;
+      }
+      .nav-btn.active svg {
+        transform: scale(1.1);
+      }
+      
+      .phase-btn.active {
+        background-color: #374151;
+        color: white;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      }
     </style>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
     "react/": "https://esm.sh/react@^19.2.4/",
-    "react": "https://esm.sh/react@^19.2.4",
-    "@google/genai": "https://esm.sh/@google/genai@^1.40.0"
+    "react": "https://esm.sh/react@^19.2.4"
   }
 }
 </script>
-</head>
-  <body>
-    <div id="root"></div>
+  </head>
+  <body class="min-h-screen bg-gradient-to-br from-gray-900 to-slate-900 text-gray-200 font-sans selection:bg-tomato selection:text-white flex flex-col overflow-hidden relative">
+
+    <!-- Header -->
+    <header class="flex justify-between items-center p-6 w-full max-w-md mx-auto z-10">
+      <h1 class="text-lg font-semibold tracking-wide text-gray-400 uppercase text-xs">ZenPomodoro</h1>
+      <button id="btn-open-settings" class="text-gray-500 hover:text-white transition-colors p-2">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+      </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col items-center justify-center w-full max-w-md mx-auto px-6 z-10">
+      
+      <!-- Phase Toggles (Only visible in Pomodoro mode) -->
+      <div id="phase-toggles" class="flex space-x-2 mb-8 bg-gray-800/50 p-1.5 rounded-2xl backdrop-blur-sm transition-opacity duration-300">
+        <button data-phase="FOCUS" class="phase-btn active transition-all duration-200 ease-in-out font-medium rounded-2xl flex items-center justify-center outline-none text-xs px-4 py-2 bg-gray-700 text-white shadow-sm">Focus</button>
+        <button data-phase="SHORT_BREAK" class="phase-btn transition-all duration-200 ease-in-out font-medium rounded-2xl flex items-center justify-center outline-none text-xs px-4 py-2 bg-transparent text-gray-500 hover:text-gray-300">Short</button>
+        <button data-phase="LONG_BREAK" class="phase-btn transition-all duration-200 ease-in-out font-medium rounded-2xl flex items-center justify-center outline-none text-xs px-4 py-2 bg-transparent text-gray-500 hover:text-gray-300">Long</button>
+      </div>
+
+      <!-- Circular Timer -->
+      <div class="relative mb-12 group">
+        <!-- Glow Effect -->
+        <div id="timer-glow" class="absolute inset-0 rounded-full blur-3xl opacity-20 transition-colors duration-700 bg-tomato"></div>
+        
+        <div class="relative flex items-center justify-center">
+          <svg height="280" width="280">
+            <!-- Background Circle -->
+            <circle
+              stroke="#2d2d2d"
+              stroke-width="6"
+              fill="transparent"
+              r="134"
+              cx="140"
+              cy="140"
+            />
+            <!-- Progress Circle -->
+            <circle
+              id="progress-ring"
+              class="progress-ring__circle"
+              stroke="#ff6347"
+              stroke-width="6"
+              fill="transparent"
+              r="134"
+              cx="140"
+              cy="140"
+              stroke-linecap="round"
+            />
+          </svg>
+          
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <span id="timer-display" class="text-6xl font-bold tracking-tight text-white tabular-nums font-sans">25:00</span>
+            <span id="timer-label" class="text-sm uppercase tracking-widest text-gray-500 font-medium mt-2">Focus</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="flex items-center space-x-6 mb-8">
+        <!-- Reset Button -->
+        <button id="btn-reset" class="p-4 rounded-full text-gray-500 hover:bg-gray-800 transition-colors duration-200" title="Reset">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+        </button>
+
+        <!-- Play/Pause Button -->
+        <button id="btn-toggle" class="w-20 h-20 rounded-full flex items-center justify-center shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-transform duration-200 bg-tomato text-white">
+          <!-- Play Icon -->
+          <svg id="icon-play" class="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <!-- Pause Icon (Hidden by default) -->
+          <svg id="icon-pause" class="w-8 h-8 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+
+        <!-- Tip Button -->
+        <button id="btn-tip" class="p-4 rounded-full text-gray-500 hover:bg-gray-800 relative group transition-colors duration-200" title="Mindfulness Tip">
+          <svg id="icon-sparkles" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+          <span class="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-xs text-gray-300 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Zen Insight</span>
+        </button>
+      </div>
+
+      <!-- AI Tip Container -->
+      <div id="tip-container" class="mt-2 mb-6 p-4 bg-gray-800/40 backdrop-blur rounded-xl border border-white/5 max-w-xs text-center animate-pulse-slow hidden cursor-pointer">
+        <p id="tip-text" class="text-sm font-light text-gray-300 leading-relaxed italic">"Breathe in, breathe out."</p>
+        <span class="block mt-2 text-xs text-gray-500 hover:text-white">dismiss</span>
+      </div>
+
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="w-full max-w-md mx-auto p-4 pb-8 z-10">
+      <div class="glass-panel rounded-2xl p-1 flex justify-around items-center shadow-2xl">
+        <button data-mode="POMODORO" class="nav-btn active flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-300 text-gray-500 hover:text-gray-300 hover:bg-gray-800/50">
+          <div class="w-6 h-6 mb-1 transition-transform"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+          <span class="text-[10px] font-medium tracking-wide">Pomodoro</span>
+        </button>
+        <button data-mode="STOPWATCH" class="nav-btn flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-300 text-gray-500 hover:text-gray-300 hover:bg-gray-800/50">
+          <div class="w-6 h-6 mb-1 transition-transform"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0zM12 2v2m-6.364 1.636l1.414 1.414" /></svg></div>
+          <span class="text-[10px] font-medium tracking-wide">Stopwatch</span>
+        </button>
+        <button data-mode="TIMER" class="nav-btn flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-300 text-gray-500 hover:text-gray-300 hover:bg-gray-800/50">
+          <div class="w-6 h-6 mb-1 transition-transform"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+          <span class="text-[10px] font-medium tracking-wide">Timer</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold text-white">Settings</h2>
+          <button id="btn-close-settings" class="text-gray-500 hover:text-white">Close</button>
+        </div>
+        
+        <div class="space-y-4">
+          <div class="flex justify-between items-center bg-gray-800/50 p-3 rounded-xl">
+            <label class="text-gray-300 text-sm font-medium">Focus (min)</label>
+            <input type="number" id="input-focus" class="w-16 bg-transparent text-right text-white font-bold outline-none border-b border-gray-700 focus:border-tomato transition-colors" value="25">
+          </div>
+          <div class="flex justify-between items-center bg-gray-800/50 p-3 rounded-xl">
+            <label class="text-gray-300 text-sm font-medium">Short Break (min)</label>
+            <input type="number" id="input-short" class="w-16 bg-transparent text-right text-white font-bold outline-none border-b border-gray-700 focus:border-tomato transition-colors" value="5">
+          </div>
+          <div class="flex justify-between items-center bg-gray-800/50 p-3 rounded-xl">
+            <label class="text-gray-300 text-sm font-medium">Long Break (min)</label>
+            <input type="number" id="input-long" class="w-16 bg-transparent text-right text-white font-bold outline-none border-b border-gray-700 focus:border-tomato transition-colors" value="15">
+          </div>
+        </div>
+
+        <button id="btn-save-settings" class="w-full mt-8 py-3 bg-white text-gray-900 font-bold rounded-2xl hover:bg-gray-100 transition-colors">
+          Save & Reset Timer
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Logic -->
+    <script type="module" src="./index.js"></script>
   </body>
 </html>
